@@ -1,0 +1,30 @@
+# render.yaml — Render deployment configuration
+# Docs: https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: gpt2-text-generator
+    runtime: python
+    region: oregon          # choose the region closest to your users
+    plan: standard          # 'free' tier has limited RAM; GPT-2 needs ~1 GB
+
+    # Build phase: install Python dependencies
+    buildCommand: pip install -r requirements.txt
+
+    # Start phase: launch with Gunicorn (production WSGI server)
+    # - 1 worker keeps memory usage low for the GPT-2 model
+    # - timeout extended to 120 s to allow model inference time
+    startCommand: gunicorn app:app --workers 1 --timeout 120 --bind 0.0.0.0:$PORT
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: PORT
+        value: "10000"      # Render exposes this port by default
+
+    # Persist the Hugging Face model cache between deploys to avoid
+    # re-downloading GPT-2 weights on every redeploy (~500 MB).
+    disk:
+      name: hf-model-cache
+      mountPath: /root/.cache/huggingface
+      sizeGB: 2

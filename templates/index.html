@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPT-2 Text Generator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- ── Header ── -->
+    <header class="header">
+      <h1 class="title">GPT-2 Text Generator</h1>
+      <p class="subtitle">
+        Type a sentence or phrase and let GPT-2 continue the story for you.
+      </p>
+    </header>
+
+    <!-- ── Input Form ── -->
+    <section class="card">
+      <label for="prompt" class="label">Your Prompt</label>
+      <textarea
+        id="prompt"
+        class="textarea"
+        rows="5"
+        maxlength="500"
+        placeholder="e.g. The future of artificial intelligence"
+      ></textarea>
+      <div class="char-count">
+        <span id="charCount">0</span> / 500
+      </div>
+
+      <!-- Validation message -->
+      <p id="errorMsg" class="error-msg" aria-live="polite"></p>
+
+      <button id="generateBtn" class="btn" type="button">
+        <span id="btnText">Generate</span>
+        <span id="btnSpinner" class="spinner hidden" aria-hidden="true"></span>
+      </button>
+    </section>
+
+    <!-- ── Output Section ── -->
+    <section class="card output-card" id="outputSection" aria-live="polite">
+      <h2 class="output-title">Generated Text</h2>
+      <p id="outputText" class="output-text"></p>
+    </section>
+
+  </div><!-- /container -->
+
+  <!-- ── JavaScript ── -->
+  <script>
+    const promptEl    = document.getElementById("prompt");
+    const charCount   = document.getElementById("charCount");
+    const generateBtn = document.getElementById("generateBtn");
+    const btnText     = document.getElementById("btnText");
+    const btnSpinner  = document.getElementById("btnSpinner");
+    const errorMsg    = document.getElementById("errorMsg");
+    const outputSection = document.getElementById("outputSection");
+    const outputText  = document.getElementById("outputText");
+
+    // Live character counter
+    promptEl.addEventListener("input", () => {
+      charCount.textContent = promptEl.value.length;
+    });
+
+    // Generate button click handler
+    generateBtn.addEventListener("click", async () => {
+      const prompt = promptEl.value.trim();
+
+      // --- Client-side validation ---
+      if (!prompt) {
+        showError("Please enter a prompt before generating.");
+        return;
+      }
+
+      clearError();
+      setLoading(true);
+      outputSection.classList.remove("visible");
+
+      try {
+        const response = await fetch("/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          showError(data.error || "Something went wrong. Please try again.");
+          return;
+        }
+
+        // Display the generated continuation
+        outputText.textContent = data.generated_text;
+        outputSection.classList.add("visible");
+
+      } catch (err) {
+        showError("Network error. Please check your connection and try again.");
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // Allow Ctrl+Enter to trigger generation
+    promptEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        generateBtn.click();
+      }
+    });
+
+    // ── Helpers ──
+
+    function setLoading(isLoading) {
+      generateBtn.disabled = isLoading;
+      btnText.textContent = isLoading ? "Generating…" : "Generate";
+      btnSpinner.classList.toggle("hidden", !isLoading);
+    }
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.add("visible");
+    }
+
+    function clearError() {
+      errorMsg.textContent = "";
+      errorMsg.classList.remove("visible");
+    }
+  </script>
+
+</body>
+</html>
