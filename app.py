@@ -1,45 +1,21 @@
 """
 GPT-2 Text Generator - Flask Application
-Uses Hugging Face Inference API (no local model, no torch required).
+Hosted on Hugging Face Spaces (runs the model directly, no API calls needed).
 """
 
 from flask import Flask, render_template, request, jsonify
-import requests
+from transformers import pipeline
 import os
 
 app = Flask(__name__)
 
 # ---------------------------------------------------------------------------
-# Hugging Face Inference API setup
-# Get a free token at https://huggingface.co/settings/tokens
+# Load the text-generation pipeline once at startup.
+# HF Spaces provides enough RAM to run DistilGPT-2 comfortably.
 # ---------------------------------------------------------------------------
-HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
-HF_API_URL = "https://api-inference.huggingface.co/models/gpt2"
-
-HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
-
-
-def generate_text(prompt: str) -> str:
-    """Call the HF Inference API and return the generated continuation."""
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 100,
-            "temperature": 0.85,
-            "top_p": 0.92,
-            "do_sample": True,
-            "return_full_text": False,   # return only the new text, not the prompt
-        }
-    }
-    response = requests.post(HF_API_URL, headers=HEADERS, json=payload, timeout=30)
-    response.raise_for_status()
-    result = response.json()
-
-    # API returns a list: [{"generated_text": "..."}]
-    if isinstance(result, list) and result:
-        return result[0].get("generated_text", "").strip()
-
-    raise ValueError("Unexpected response from API")
+print("Loading DistilGPT-2 pipeline...")
+generator = pipeline("text-generation", model="distilgpt2")
+print("Model ready.")
 
 
 # ---------------------------------------------------------------------------
@@ -64,16 +40,28 @@ def generate():
         return jsonify({"error": "Prompt is too long. Keep it under 500 characters."}), 400
 
     try:
-        generated = generate_text(prompt)
+        result = generator(
+            prompt,
+            max_new_tokens=100,
+            do_sample=True,
+            temperature=0.85,
+            top_p=0.92,
+            repetition_penalty=1.2,
+            pad_token_id=50256,   # GPT-2 EOS token id
+        )
+        # pipeline returns full text; strip the original prompt off the front
+        full_text = result[0]["generated_text"]
+        generated = full_text[len(prompt):].strip()
         return jsonify({"generated_text": generated})
+
     except Exception as e:
-        print(f"API error: {e}")
-        return jsonify({"error": "Generation failed. Please try again in a moment."}), 500
+        print(f"Generation error: {e}")
+        return jsonify({"error": "Generation failed. Please try again."}), 500
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 7860))  # HF Spaces default port
     app.run(host="0.0.0.0", port=port, debug=False)
