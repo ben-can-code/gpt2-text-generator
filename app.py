@@ -15,10 +15,13 @@ app = Flask(__name__)
 # Load the GPT-2 model and tokenizer once at startup to avoid reloading on
 # every request. Using the small 'gpt2' checkpoint for fast inference.
 # ---------------------------------------------------------------------------
-print("Loading GPT-2 model... (this may take a moment on first run)")
+print("Loading DistilGPT-2 model... (this may take a moment on first run)")
 
-tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-model = GPT2LMHeadModel.from_pretrained("gpt2")
+# DistilGPT-2 is a lightweight distilled version of GPT-2.
+# It is ~85 MB (vs ~500 MB for full GPT-2), fits within the 512 MB
+# free-tier RAM limit on Render, and still produces good continuations.
+tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+model = GPT2LMHeadModel.from_pretrained("distilgpt2")
 model.eval()  # Set to evaluation mode (disables dropout, etc.)
 
 # Use GPU if available, otherwise fall back to CPU
